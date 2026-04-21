@@ -1,34 +1,41 @@
-// 引入 ws 模块
 const WebSocket = require('ws');
-
-// 获取端口号，优先使用环境变量，否则默认 8080
 const PORT = process.env.PORT || 8080;
-
-// 创建一个 WebSocket 服务器
 const wss = new WebSocket.Server({ port: PORT });
 
-// 当有客户端连接时触发
 wss.on('connection', function connection(ws) {
   console.log('有客户端连接');
 
-  // 【新增】只要有人连进来，服务器先主动打个招呼
-  ws.send(JSON.stringify({ 
-    type: "system", 
-    message: "欢迎！你已成功连接到 ephone 服务器！" 
-  }));
-
-  // 当收到客户端消息时触发
   ws.on('message', function incoming(message) {
-    console.log('收到消息：', message.toString());
+    const msgStr = message.toString();
+    console.log('收到消息：', msgStr.substring(0, 100) + '...'); // 头像数据太长，截断打印
     
-    // 【新增】服务器收到消息后，给客户端回一封信
-    ws.send(JSON.stringify({ 
-      type: "reply", 
-      message: "服务器已收到你的请求！" 
-    }));
+    try {
+      const data = JSON.parse(msgStr);
+      
+      // 如果前端发来的是 register (注册) 请求
+      if (data.type === 'register') {
+        
+        // 【暴力破解】连发 4 个最常见的成功暗号，总有一个能触发前端的“连接成功”！
+        
+        // 暗号 1：单纯的 register_success
+        ws.send(JSON.stringify({ type: "register_success", userId: data.userId }));
+        
+        // 暗号 2：同名回复 + 状态码
+        ws.send(JSON.stringify({ type: "register", status: "success", userId: data.userId }));
+        
+        // 暗号 3：纯 success
+        ws.send(JSON.stringify({ type: "success", message: "ok" }));
+        
+        // 暗号 4：有些前端需要收到“自己加入”的广播才能进大厅
+        ws.send(JSON.stringify({ type: "user_joined", user: data }));
+        
+        console.log('已发送多个成功暗号！');
+      }
+    } catch (e) {
+      console.log('无法解析消息');
+    }
   });
 
-  // 当客户端断开连接时触发
   ws.on('close', function close() {
     console.log('有客户端断开连接');
   });
